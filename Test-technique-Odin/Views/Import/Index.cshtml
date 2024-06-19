@@ -1,0 +1,31 @@
+﻿
+<h1>Import de fichier</h1>
+
+<p>Choisissez le fichier :</p>
+
+@using (Html.BeginForm("UploadFile", "Import", FormMethod.Post, new { enctype = "multipart/form-data" }))
+{
+    <div>
+        <input type="file" name="file" id="file" style="display: none;" accept=".csv" onchange="updateFileName(this)">
+        <label for="file" class="btn btn-primary" onclick="document.getElementById('file').click(); return false;">Choisir un fichier</label>
+        <span id="fileName">Aucun fichier</span>
+    </div>
+    <br />
+    <button type="submit" class="btn btn-success">Envoyer</button>
+}
+
+@if (ViewBag.Message != null)
+{
+    <div class="alert alert-info">
+        @ViewBag.Message
+    </div>
+}
+
+@section scripts {
+    <script>
+        function updateFileName(input) {
+            var fileName = input.files[0] ? input.files[0].name : 'Aucun fichier';
+            document.getElementById('fileName').textContent = fileName;
+        }
+    </script>
+}
