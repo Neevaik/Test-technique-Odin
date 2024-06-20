@@ -7,4 +7,8 @@
     <RootNamespace>Test_technique_Odin</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Folder Include="wwwroot\uploads\" />
+  </ItemGroup>
+
 </Project>

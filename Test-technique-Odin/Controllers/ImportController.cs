@@ -18,8 +18,8 @@ namespace VotreNamespace.Controllers
         {
             try
             {
-                var processedData = await ProcessCsvFile(file);
-
+                var inputDate = await ProcessCsvFile(file);
+                var processedData =  ProcessInputData(inputDate);
                 await SaveProcessedData(processedData, file);
 
 
@@ -34,10 +34,11 @@ namespace VotreNamespace.Controllers
             return View("Index");
         }
 
-        private async Task<IEnumerable<ProcessedDataModel>> ProcessCsvFile(IFormFile file)
+
+
+        private async Task<IEnumerable<InputCsvModel>> ProcessCsvFile(IFormFile file)
         {
-            var processedData = new List<ProcessedDataModel>();
-            var processedDates = new HashSet<DateTime>(); // Utilisation d'un HashSet pour suivre les dates déjà traitées
+            var inputData = new List<InputCsvModel>();
 
             using (var reader = new StreamReader(file.OpenReadStream(), Encoding.Default))
             {
@@ -54,28 +55,53 @@ namespace VotreNamespace.Controllers
 
                     var columns = line.Split(';');
 
-                    var date = DateTime.ParseExact(columns[6].Trim('"'), "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-
-                    // Vérifie si la date a déjà été traitée
-                    if (!processedDates.Contains(date))
+                    var data = new InputCsvModel
                     {
-                        processedDates.Add(date); // Ajouter la date au HashSet pour marquer comme traitée
+                        OrderId = columns[0].Trim('"'),
+                        Nature = columns[1].Trim('"'),
+                        OperationType = columns[2].Trim('"'),
+                        Amount = decimal.Parse(columns[3].Trim('"'), CultureInfo.InvariantCulture),
+                        Currency = columns[4].Trim('"'),
+                        BillingFees = decimal.Parse(columns[5].Trim('"'), CultureInfo.InvariantCulture),
+                        Date = DateTime.ParseExact(columns[6].Trim('"'), "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                        ChargebackDate = columns[7].Trim('"'),
+                        TransferReference = columns[8].Trim('"'),
+                        ExtraData = columns[9].Trim('"'),
+                        SecureFee = decimal.Parse(columns[10].Trim('"'), CultureInfo.InvariantCulture)
+                    };
 
-                        var model = new ProcessedDataModel
-                        {
-                            Date = date,
-                            TotalAmount = 0,
-                            TotalBillingFee = 0,
-                            Total3dsFee = 0 
-                        };
+                    inputData.Add(data);
+                }
+            }
 
-                        processedData.Add(model);
-                    }
+            return inputData;
+        }
+        private IEnumerable<ProcessedDataModel> ProcessInputData(IEnumerable<InputCsvModel> inputData)
+        {
+            var processedData = new List<ProcessedDataModel>();
+            var processedDates = new HashSet<DateTime>();
+
+            foreach (var input in inputData)
+            {
+                if (!processedDates.Contains(input.Date))
+                {
+                    processedDates.Add(input.Date);
+
+                    var processedItem = new ProcessedDataModel
+                    {
+                        Date = input.Date,
+                        TotalAmount = 0,
+                        TotalBillingFee = 0,
+                        Total3dsFee = 0
+                    };
+
+                    processedData.Add(processedItem);
                 }
             }
 
             return processedData;
         }
+
 
         private async Task SaveProcessedData(IEnumerable<ProcessedDataModel> data, IFormFile file)
         {
