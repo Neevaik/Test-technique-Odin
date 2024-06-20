@@ -1,4 +1,5 @@
-﻿
+﻿@model Test_technique_Odin.Models.LoggerModel
+
 <h1>Import de fichier</h1>
 
 <p>Choisissez le fichier :</p>
@@ -19,6 +20,30 @@
     <div class="alert alert-info">
         @ViewBag.Message
     </div>
+}
+
+@if (ViewData["Results"] != null)
+{
+    var results = ViewData["Results"] as Test_technique_Odin.Models.LoggerModel;
+
+    <h2>Résumé du traitement</h2>
+    <p><strong>Nombre de lignes traitées :</strong> @results.LinePorcessed</p>
+    <p><strong>Nombre de lignes correctes :</strong> @results.SuccessfulLines</p>
+
+    @if (results.ErrorLines.Any())
+    {
+        <h3>Erreurs rencontrées :</h3>
+        <ul>
+            @foreach (var error in results.ErrorLines)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    }
+    else
+    {
+        <p>Aucune erreur rencontrée.</p>
+    }
 }
 
 @section scripts {
