@@ -1,5 +1,4 @@
 ﻿
-using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Mvc;
 using System.Globalization;
 using System.Text;
@@ -80,22 +79,19 @@ namespace VotreNamespace.Controllers
 
             return inputData;
         }
+
         private IEnumerable<ProcessedDataModel> ProcessInputData(IEnumerable<InputCsvModel> inputData)
         {
-            var processedData = new List<ProcessedDataModel>();
-
-            var groupedData = inputData.GroupBy(d => d.Date)
-                                       .Select(g => new ProcessedDataModel
-                                       {
-                                           Date = g.Key,
-                                           TotalAmount = g.Sum(d => d.Amount),
-                                           TotalBillingFee = g.Sum(d => d.BillingFees),
-                                           Total3dsFee = g.Sum(d => d.SecureFee)
-                                       });
-
-            processedData.AddRange(groupedData);
-
-            return processedData;
+            return inputData
+                .Where(i => i.OperationType == "payment")
+                .GroupBy(i => i.Date.Date)
+                .Select(g => new ProcessedDataModel
+                {
+                    Date = g.Key,
+                    TotalAmount = g.Sum(d => d.Amount),
+                    TotalBillingFee = g.Sum(d => d.BillingFees),
+                    Total3dsFee = g.Sum(d => d.SecureFee)
+                });
         }
 
 
@@ -136,7 +132,15 @@ namespace VotreNamespace.Controllers
         {
             foreach (var data in inputData)
             {
-                Console.WriteLine($"OrderId: {data.OrderId}, Date: {data.Date}, Amount: {data.Amount}");
+                Console.WriteLine($"OrderId: {data.OrderId}, " +
+                    $"Date: {data.Date}, " +
+                    $"Amount: {data.Amount}," +
+                    $"CURRENCY: {data.Currency}," +
+                    $"BILLINGFEES: {data.BillingFees}," +
+                    $"CHARGEBACKDATE: {data.ChargebackDate}," +
+                    $"TransferReference: {data.TransferReference}," +
+                    $"ExtraData: {data.ExtraData}," +
+                    $"Securefee: {data.SecureFee},");
             }
         }
         #endregion
