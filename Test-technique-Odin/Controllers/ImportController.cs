@@ -1,4 +1,5 @@
 ﻿
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Mvc;
 using System.Globalization;
 using System.Text;
@@ -18,8 +19,11 @@ namespace VotreNamespace.Controllers
         {
             try
             {
-                var inputDate = await ProcessCsvFile(file);
-                var processedData =  ProcessInputData(inputDate);
+                var inputData = await ProcessCsvFile(file);
+
+                VerifyInputData(inputData);
+
+                var processedData =  ProcessInputData(inputData);
                 await SaveProcessedData(processedData, file);
 
 
@@ -43,14 +47,14 @@ namespace VotreNamespace.Controllers
             using (var reader = new StreamReader(file.OpenReadStream(), Encoding.Default))
             {
                 string line;
-                bool isFirstLine = true; // Skip header line
+                bool isFirstLine = true;
 
                 while ((line = await reader.ReadLineAsync()) != null)
                 {
                     if (isFirstLine)
                     {
                         isFirstLine = false;
-                        continue; // Skip header line
+                        continue;
                     }
 
                     var columns = line.Split(';');
@@ -79,25 +83,17 @@ namespace VotreNamespace.Controllers
         private IEnumerable<ProcessedDataModel> ProcessInputData(IEnumerable<InputCsvModel> inputData)
         {
             var processedData = new List<ProcessedDataModel>();
-            var processedDates = new HashSet<DateTime>();
 
-            foreach (var input in inputData)
-            {
-                if (!processedDates.Contains(input.Date))
-                {
-                    processedDates.Add(input.Date);
+            var groupedData = inputData.GroupBy(d => d.Date)
+                                       .Select(g => new ProcessedDataModel
+                                       {
+                                           Date = g.Key,
+                                           TotalAmount = g.Sum(d => d.Amount),
+                                           TotalBillingFee = g.Sum(d => d.BillingFees),
+                                           Total3dsFee = g.Sum(d => d.SecureFee)
+                                       });
 
-                    var processedItem = new ProcessedDataModel
-                    {
-                        Date = input.Date,
-                        TotalAmount = 0,
-                        TotalBillingFee = 0,
-                        Total3dsFee = 0
-                    };
-
-                    processedData.Add(processedItem);
-                }
-            }
+            processedData.AddRange(groupedData);
 
             return processedData;
         }
@@ -128,6 +124,7 @@ namespace VotreNamespace.Controllers
         }
 
 
+        #region Tools
         private string GenerateFileName(IFormFile file)
         {
             var getFileName = Path.GetFileName(file.FileName);
@@ -135,7 +132,14 @@ namespace VotreNamespace.Controllers
 
             return $"{dateString}ProcessedFile_{Path.GetFileNameWithoutExtension(getFileName)}.csv"; ;
         }
-
+        private void VerifyInputData(IEnumerable<InputCsvModel> inputData)
+        {
+            foreach (var data in inputData)
+            {
+                Console.WriteLine($"OrderId: {data.OrderId}, Date: {data.Date}, Amount: {data.Amount}");
+            }
+        }
+        #endregion
 
     }
 }
