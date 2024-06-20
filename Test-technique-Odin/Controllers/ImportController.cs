@@ -1,11 +1,10 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.IO;
+using System.Globalization;
 using System.Text;
-using System.Threading.Tasks;
+using Test_technique_Odin.Models;
 
-namespace Test_technique_Odin.Controllers
+namespace VotreNamespace.Controllers
 {
     public class ImportController : Controller
     {
@@ -17,50 +16,100 @@ namespace Test_technique_Odin.Controllers
         [HttpPost]
         public async Task<IActionResult> UploadFile(IFormFile file)
         {
-            
-                string newFileName = GenerateFileName(file);
+            try
+            {
+                var processedData = await ProcessCsvFile(file);
 
-                string filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads", newFileName);
+                await SaveProcessedData(processedData, file);
 
-                CreateUploadDirectory(Path.GetDirectoryName(filePath));
 
-                await SaveFile(file, filePath);
 
-                ProceedFile(filePath);
-
-                ViewBag.Message = "Fichier importé et traité avec succès";
-            
-            
+                ViewBag.Message = "File uploaded and processed successfully!";
+            }
+            catch (Exception ex)
+            {
+                ModelState.AddModelError("File", $"Error processing file: {ex.Message}");
+            }
 
             return View("Index");
         }
 
+        private async Task<IEnumerable<ProcessedDataModel>> ProcessCsvFile(IFormFile file)
+        {
+            var processedData = new List<ProcessedDataModel>();
+            var processedDates = new HashSet<DateTime>(); // Utilisation d'un HashSet pour suivre les dates déjà traitées
+
+            using (var reader = new StreamReader(file.OpenReadStream(), Encoding.Default))
+            {
+                string line;
+                bool isFirstLine = true; // Skip header line
+
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    if (isFirstLine)
+                    {
+                        isFirstLine = false;
+                        continue; // Skip header line
+                    }
+
+                    var columns = line.Split(';');
+
+                    var date = DateTime.ParseExact(columns[6].Trim('"'), "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+
+                    // Vérifie si la date a déjà été traitée
+                    if (!processedDates.Contains(date))
+                    {
+                        processedDates.Add(date); // Ajouter la date au HashSet pour marquer comme traitée
+
+                        var model = new ProcessedDataModel
+                        {
+                            Date = date,
+                            TotalAmount = 0,
+                            TotalBillingFee = 0,
+                            Total3dsFee = 0 
+                        };
+
+                        processedData.Add(model);
+                    }
+                }
+            }
+
+            return processedData;
+        }
+
+        private async Task SaveProcessedData(IEnumerable<ProcessedDataModel> data, IFormFile file)
+        {
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads");
+
+            if (!Directory.Exists(uploadsFolder))
+            {
+                Directory.CreateDirectory(uploadsFolder);
+            }
+
+            string newFileName = GenerateFileName(file);
+
+            var filePath = Path.Combine(uploadsFolder, newFileName);
+
+            using (var writer = new StreamWriter(filePath))
+            {
+                await writer.WriteLineAsync("Date;TotalAmount;TotalBillingFee;Total3dsFee");
+
+                foreach (var item in data)
+                {
+                    await writer.WriteLineAsync($"{item.Date.ToString("yyyy-MM-dd HH:mm:ss")};{item.TotalAmount};{item.TotalBillingFee};{item.Total3dsFee}");
+                }
+            }
+        }
+
+
         private string GenerateFileName(IFormFile file)
         {
+            var getFileName = Path.GetFileName(file.FileName);
             string dateString = DateTime.Now.ToString("yyyyMMdd") + "-";
-            return dateString + Path.GetFileName(file.FileName);
+
+            return $"{dateString}ProcessedFile_{Path.GetFileNameWithoutExtension(getFileName)}.csv"; ;
         }
 
-        private async Task SaveFile(IFormFile file, string filePath)
-        {
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
-        }
 
-        private void CreateUploadDirectory(string directoryPath)
-        {
-            if (!Directory.Exists(directoryPath))
-            {
-                Directory.CreateDirectory(directoryPath);
-            }
-        }
-
-        private void ProceedFile(string filePath)
-        {
-            string headers = "Date;TotalAmount;TotalBillingFee;Total3dsFee\r\n";
-            System.IO.File.WriteAllText(filePath, headers, Encoding.UTF8);
-        }
     }
 }
