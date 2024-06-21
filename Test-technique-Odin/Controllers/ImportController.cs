@@ -1,19 +1,21 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using System.Globalization;
-using System.Text;
+using Test_technique_Odin.Interfaces;
 using Test_technique_Odin.Models;
 
-namespace VotreNamespace.Controllers
+namespace Test_technique_Odin.Controllers
 {
     public class ImportController : Controller
     {
-        private readonly ILogger<ImportController> _logger;
+        private readonly ICsvProcessingService _csvService;
+        private readonly IDataProcessingService _dataService;
+        private readonly ILoggerService _logger;
 
-        public ImportController(ILogger<ImportController> logger)
+        public ImportController(ICsvProcessingService csvService, IDataProcessingService dataService, ILoggerService logger)
         {
+            _csvService = csvService;
+            _dataService = dataService;
             _logger = logger;
         }
-
         public IActionResult Index()
         {
             return View();
@@ -22,103 +24,34 @@ namespace VotreNamespace.Controllers
         [HttpPost]
         public async Task<IActionResult> UploadFile(IFormFile file)
         {
-
-            var results = new LoggerModel
-            {
-                ErrorLines = new List<string>()
-            };
+            var results = new LoggerModel();
+            results.ErrorLines = new List<string>();
 
             try
             {
-                var inputData = await ProcessCsvFile(file, results);
+                var inputData = await _csvService.ProcessCsvFile(file, results);
                 results.LinePorcessed = inputData.Count();
 
-                var processedData = ProcessInputData(inputData);
+                var processedData = _dataService.ProcessInputData(inputData);
                 results.SuccessfulLines = processedData.Count();
 
                 await SaveProcessedData(processedData, file);
 
+                ViewBag.Message = "File uploaded and processed successfully!";
             }
             catch (Exception ex)
             {
-                results.ErrorLines.Add($"Error processing file: {ex.Message}");
+                _logger.LogError(ex, "Error processing file");
                 foreach (var error in results.ErrorLines)
                 {
                     _logger.LogError(error);
                 }
-
-                _logger.LogError(ex, "Error processing file");
             }
 
-            _logger.LogInformation($"Total lines processed : {results.LinePorcessed}, Successful lines: {results.SuccessfulLines}");
-
+            _logger.LogInformation($"Uploaded has success. Lines processed: {results.LinePorcessed}, Successful lines: {results.SuccessfulLines}");
 
             ViewData["Results"] = results;
             return View("Index");
-        }
-
-        private async Task<IEnumerable<InputCsvModel>> ProcessCsvFile(IFormFile file, LoggerModel results)
-        {
-            var inputData = new List<InputCsvModel>();
-
-            using (var reader = new StreamReader(file.OpenReadStream(), Encoding.Default))
-            {
-                string line;
-                bool isFirstLine = true;
-                int lineNumber = 0;
-
-                while ((line = await reader.ReadLineAsync()) != null)
-                {
-                    lineNumber++;
-                    if (isFirstLine)
-                    {
-                        isFirstLine = false;
-                        continue;
-                    }
-
-                    try
-                    {
-                        var columns = line.Split(';');
-
-                        var data = new InputCsvModel
-                        {
-                            OrderId = columns.Length > 0 ? columns[0].Trim('"') : throw new Exception("Missing OrderId"),
-                            Nature = columns.Length > 1 ? columns[1].Trim('"') : throw new Exception("Missing Nature"),
-                            OperationType = columns.Length > 2 ? columns[2].Trim('"') : throw new Exception("Missing OperationType"),
-                            Amount = columns.Length > 3 ? decimal.Parse(columns[3].Trim('"'), CultureInfo.InvariantCulture) : throw new Exception("Missing Amount"),
-                            Currency = columns.Length > 4 ? columns[4].Trim('"') : throw new Exception("Missing Currency"),
-                            BillingFees = columns.Length > 5 ? decimal.Parse(columns[5].Trim('"'), CultureInfo.InvariantCulture) : throw new Exception("Missing BillingFees"),
-                            Date = columns.Length > 6 ? DateTime.ParseExact(columns[6].Trim('"'), "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) : throw new Exception("Missing Date"),
-                            ChargebackDate = columns.Length > 7 ? columns[7].Trim('"') : string.Empty,
-                            TransferReference = columns.Length > 8 ? columns[8].Trim('"') : string.Empty,
-                            ExtraData = columns.Length > 9 ? columns[9].Trim('"') : string.Empty,
-                            SecureFee = columns.Length > 10 ? decimal.Parse(columns[10].Trim('"'), CultureInfo.InvariantCulture) : throw new Exception("Missing SecureFee")
-                        };
-
-                        inputData.Add(data);
-                    }
-                    catch (Exception ex)
-                    {
-                        results.ErrorLines.Add($"Line {lineNumber}: {ex.Message}");
-                    }
-                }
-            }
-
-            return inputData;
-        }
-
-        private IEnumerable<ProcessedDataModel> ProcessInputData(IEnumerable<InputCsvModel> inputData)
-        {
-            return inputData
-                .Where(i => i.OperationType == "payment")
-                .GroupBy(i => i.Date.Date)
-                .Select(g => new ProcessedDataModel
-                {
-                    Date = g.Key,
-                    TotalAmount = g.Sum(d => d.Amount),
-                    TotalBillingFee = g.Sum(d => d.BillingFees),
-                    Total3dsFee = g.Sum(d => d.SecureFee)
-                });
         }
 
         private async Task SaveProcessedData(IEnumerable<ProcessedDataModel> data, IFormFile file)

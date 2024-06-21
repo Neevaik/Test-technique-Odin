@@ -1,6 +1,4 @@
-﻿using Test_technique_Odin.Interfaces;
-
-namespace Test_technique_Odin.Models
+﻿namespace Test_technique_Odin.Models
 {
     public class ProcessedDataModel
     {

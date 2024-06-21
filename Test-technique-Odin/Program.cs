@@ -1,7 +1,14 @@
+using Test_technique_Odin.Interfaces;
+using Test_technique_Odin.Models.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddScoped<ICsvProcessingService, CsvProcessingService>();
+builder.Services.AddScoped<IDataProcessingService, DataProcessingService>();
+builder.Services.AddScoped<ILoggerService, LoggerService>();
+
 
 var app = builder.Build();
 
